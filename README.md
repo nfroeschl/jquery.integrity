@@ -103,8 +103,4 @@ and can be used just like their parameterized counterparts.
 
 ## Statement of Non-Support ##
 
-<<<<<<< HEAD
 This plugin is provided without warranties or conditions of any kind, either express or implied. As such, there is no support offered for it. [Please report any bugs or issues you find](https://github.com/scottoffen/jquery.integrity/issues) so that I can get it fixed. New features will be considered, but I make no promises about implementing them.
-=======
-This plugin is provided without warranties or conditions of any kind, either express or implied. As such, there is no support offered for it. [Please report any bugs or issues you find](https://github.com/scottoffen/jquery.integrity/issues) so that I can get it fixed. New features will be considered, but I make no promises about implementing them.
->>>>>>> 245ff1b43db2f65e7267e9f5b17cc99d9b64defa

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang=en>
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<title>jQuery Integrity Plugin Demo</title>
+
+		<link rel="icon" type="image/png" href="/favicon.png">
+		<!--[if IE]>
+			<link rel="shortcut icon" href="/favicon.ico">
+		<![endif]-->
+
+		<link rel="stylesheet" href="/css/bootstrap.min.css">
+		<link rel="stylesheet" href="/css/bootstrap-theme.min.css">
+		<link rel="stylesheet" href="/css/font-awesome.min.css">
+
+		<style>
+			.message
+			{
+				position    : fixed;
+				top         : 20px;
+				right       : 20px;
+				width       : 300px;
+				z-index     : 9999;
+			}
+		</style>
+
+		<!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+		<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+		<!--[if lt IE 9]>
+			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+			<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+		<![endif]-->
+
+		<script language='JavaScript'>
+			var weburl = '<%weburl%>';
+		</script>
+		<script src="/js/jquery.min.js"></script>
+		<script src="/js/bootstrap.min.js"></script>
+		<script src="/js/jquery.xml2json.js"></script>
+		<script src="/js/jquery.soap.js"></script>
+		<script src="/js/jquery.integrity.js"></script>
+		<script>
+			$(document).ready(function ()
+			{
+				$("#btnTest").click(runTest);
+
+				$.integrity
+				.setCallback('beforeSend', function (soapEnvelope)
+				{
+					$('#request').text(soapEnvelope.toString());
+				})
+				.setCallback('success', function (soapEnvelope)
+				{
+					var json = (soapEnvelope.toJSON()).Body;
+					var type = 'success';
+					var msg  = false;
+
+					if (json.createItemResponse)
+					{
+						msg = 'Created Item ' + json.createItemResponse.return['ns1:ItemId'];
+					}
+					else if (json.editItemResponse)
+					{
+						msg = 'Saved Item ' + json.editItemResponse.return['ns1:ItemId'];
+					}
+
+					if (msg)
+					{
+						growl(type, msg);
+					}
+				})
+				.setCallback('error', function (soapEnvelope)
+				{
+					var json = (soapEnvelope.toJSON()).Body.Fault;
+					var type = 'danger';
+					var msg  = '<strong>' + json.faultstring + '</strong> : ' + json.detail.MKSException;
+
+					growl(type, msg);
+				})
+				.setDefault('username', 'username')
+				.setDefault('password', 'password');
+			});
+
+			function runTest ()
+			{
+				$('#response').text('Requesting...');
+				$('#request').text('Request');
+
+				var itemId = $('#ItemId').val() || '123456';
+
+				$.integrity.edit( { 'ItemId' : itemId }, function (soapResponse)
+				{
+					$('#response').text(JSON.stringify(soapResponse.toJSON()));
+				},
+				function (soapResponse)
+				{
+					$('#response').text(JSON.stringify(soapResponse.toJSON()));
+				});
+			}
+
+			function growl(type, msg)
+			{
+				var message = $('<div class="alert alert-' + type + ' message alert-dismissible" style="display: none;">');
+				var close   = $('<button type="button" class="close" data-dismiss="alert">&times</button>');
+				message.append(close);
+				message.append(msg);
+
+				message.appendTo($('body')).fadeIn(300).delay(1500).fadeOut(300);
+			}
+		</script>
+	</head>
+	<body>
+		<br>
+		<section>
+			<div class="container">
+				<div class="form-group">
+					<div class="row">
+						<div class="col-md-1">
+							<button id="btnTest" type="button" class="btn btn-primary">Test</button>
+						</div>
+						<div class="col-md-11">
+							<input type="text" class="form-control" id="ItemId" placeholder="Enter Item Id (Default 123456)">
+						</div>
+					</div>
+				</div>
+				<div class="row ">
+					<div class="col-md-6">
+						<p>Request:</p>
+						<pre id="request"></pre>
+					</div>
+					<div class="col-md-6">
+						<p>Response:</p>
+						<pre id="response"></pre>
+					</div>
+				</div>
+			</div>
+		</section>
+	</body>
+</html>

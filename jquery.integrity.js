@@ -13,7 +13,11 @@
 			'xmlns:sch' : 'http://webservice.mks.com/10/Integrity/schema'
 		},
 		SOAPAction : '',
-		enableLogging : false
+		enableLogging : false,
+		HTTPHeaders:
+		{
+			"Content-Type" : "text/xml; charset=utf-8"
+		}
 	};
 
 	var integrity =
@@ -38,6 +42,9 @@
 	***********************************************************************************/
 	$.integrity = function (verb, params, success, error)
 	{
+		var config = {};
+		$.extend(config, defaults);
+
 		/***********************************************************************************
 		* Type checking                                                                    *
 		***********************************************************************************/
@@ -48,43 +55,50 @@
 
 		if ((params === undefined) || (params === null))
 		{
-			throw new Error('Missing webservice object parameters');
+			throw new Error('Missing web service object parameters');
 		}
 
 		if (typeof params !== 'object')
 		{
-			throw new ReferenceError('Webservice parameters must be of type object');
+			throw new ReferenceError('Web service parameters must be of type object');
 		}
 		/**********************************************************************************/
 
-		var config = {};
-		$.extend(config, defaults);
 
+		/***********************************************************************************
+		* Modify local success method                                                      *
+		***********************************************************************************/
 		if (typeof success === 'function')
 		{
-			var callback = config.success;
+			var scallback = config.success;
 			config.success = function (soapResponse)
 			{
-				if (typeof callback === 'function')
+				if (typeof scallback === 'function')
 				{
-					callback.call(this, soapResponse);
+					scallback.call(this, soapResponse);
 				}
 				success.call(this, soapResponse);
 			}
 		}
+		/**********************************************************************************/
 
+
+		/***********************************************************************************
+		* Modify local error method                                                        *
+		***********************************************************************************/
 		if (typeof error === 'function')
 		{
-			var callback = config.error;
+			var ecallback = config.error;
 			config.error = function (soapResponse)
 			{
-				if (typeof callback === 'function')
+				if (typeof ecallback === 'function')
 				{
-					callback.call(this, soapResponse);
+					ecallback.call(this, soapResponse);
 				}
 				error.call(this, soapResponse);
 			}
 		}
+		/**********************************************************************************/
 
 		config.data = envelope(verb, params);
 		return $.soap(config);
@@ -196,7 +210,7 @@
 		env.push('<soapenv:Body>');
 		env.push('<' + method + '>');
 
-		switch(verb.toLowerCase())
+		switch(verb)
 		{
 			case 'create' :
 				env.push('<arg0 Type="' + params.Type + '">');
@@ -246,16 +260,16 @@
 	}
 
 
-	function gettags (obj)
+	function gettags (params)
 	{
 		var tags = [];
 
-		for (var key in obj.ItemFields)
+		for (var key in params.ItemFields)
 		{
-			if (obj.ItemFields.hasOwnProperty(key))
+			if (params.ItemFields.hasOwnProperty(key))
 			{
-				var type  = obj.ItemFields[key].type;
-				var value = obj.ItemFields[key].value;
+				var type  = params.ItemFields[key].type;
+				var value = params.ItemFields[key].value;
 
 				switch (type)
 				{
@@ -269,11 +283,11 @@
 
 						tag.push('<sch:ItemField Name="' + key + '"><sch:' + type + '>');
 
-						if (value.Values !== undefined)
+						if (value !== undefined)
 						{
-							for (var i = 0, l = value.Values.length; i < l; i += 1)
+							for (var i = 0, l = value.length; i < l; i += 1)
 							{
-								tag.push('<sch:value>' + value.Values[i] + '</sch:value>');
+								tag.push('<sch:value>' + value[i] + '</sch:value>');
 							}
 						}
 
@@ -281,17 +295,17 @@
 						tags.push(tag.join(''));
 						break;
 					case 'user':
-						tags.push('<sch:ItemField Name="' + key + '"><sch:' + type + '><sch:value>' + value.Values.join(",") + '</sch:value></sch:' + type + '></sch:ItemField>');
+						tags.push('<sch:ItemField Name="' + key + '"><sch:' + type + '><sch:value>' + value.join(",") + '</sch:value></sch:' + type + '></sch:ItemField>');
 						break;
+					case 'boolean':
 					case 'date':
 					case 'dateTime':
-					case 'group':
-					case 'siProject':
 					case 'double':
-					case 'boolean':
+					case 'group':
 					case 'integer':
 					case 'project':
 					case 'shorttext':
+					case 'siProject':
 					case 'longtext':
 					default:
 						tags.push('<sch:ItemField Name="' + key + '"><sch:' + type + '><sch:value>' + value + '</sch:value></sch:' + type + '></sch:ItemField>');
@@ -316,9 +330,4 @@
 
 		return tag.join('');
 	}
-
-<<<<<<< HEAD
 })(jQuery);
-=======
-})(jQuery);
->>>>>>> 245ff1b43db2f65e7267e9f5b17cc99d9b64defa

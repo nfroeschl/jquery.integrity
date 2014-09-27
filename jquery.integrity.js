@@ -120,6 +120,11 @@
 		{
 			throw new ReferenceError('Web service parameters must be of type object');
 		}
+
+		if ((!integrity.username) || (!integrity.password))
+		{
+			throw new Error('Missing credentials');
+		}
 		/**********************************************************************************/
 
 
@@ -185,12 +190,12 @@
 
 			if (typeof bscallback === 'function')
 			{
-				bscallback.call(params, jqxhr, params);
+				bscallback.call(params, jqxhr);
 			}
 
 			if (typeof beforeSend === 'function')
 			{
-				return beforeSend.call(params, jqxhr, params);
+				return beforeSend.call(params, jqxhr);
 			}
 		}
 		/**********************************************************************************/
@@ -220,7 +225,8 @@
 		{
 			defaults.success = callback;
 		}
-		return $.integrity;
+
+		return this;
 	};
 
 	$.integrity.error = function (callback)
@@ -229,7 +235,7 @@
 		{
 			defaults.error = callback;
 		}
-		return $.integrity;
+		return this;
 	};
 
 	$.integrity.beforeSend = function (callback)
@@ -238,7 +244,7 @@
 		{
 			defaults.beforeSend = callback;
 		}
-		return $.integrity;
+		return this;
 	};
 
 	$.integrity.setUrl = function (url)
@@ -248,7 +254,7 @@
 			defaults.url = url;
 		}
 
-		return $.integrity;
+		return this;
 	};
 
 	$.integrity.getUrl = function ()
@@ -261,20 +267,53 @@
 		if (typeof username === 'string')
 		{
 			integrity.username = username;
+			localStorage.setItem('credentials-username', username);
 		}
 
-		return $.integrity;
+		return this;
 	};
 
 	$.integrity.setPassword = function (password)
 	{
 		if (typeof password === 'string')
 		{
+			sessionStorage.setItem('credentials-password', btoa(password));
 			integrity.password = password;
 		}
 
-		return $.integrity;
+		return this;
 	};
+
+	$.integrity.impersonate = function (user)
+	{
+		if (typeof user === 'string')
+		{
+			integrity.impersonating = user;
+		}
+
+		return this;
+	};
+
+	$.integrity.dateformat = function (format)
+	{
+		if (typeof format === 'string')
+		{
+			integrity.dateformat = format;
+		}
+
+		return this;
+	};
+
+	$.integrity.datetimeformat = function (format)
+	{
+		if (typeof format === 'string')
+		{
+			integrity.datetimeformat = format;
+		}
+
+		return this;
+	};
+
 
 	$.integrity.credentials = function (callback)
 	{
@@ -354,6 +393,11 @@
 					{
 						$(evt.target).parent().removeClass('has-error');
 					});
+
+					$('#modal-credentials').on('hidden.bs.modal', function ()
+					{
+					    $('#credentials-form').off();
+					});
 				}
 				/**********************************************************************************/
 
@@ -366,12 +410,14 @@
 					'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:int="http://webservice.mks.com/10/Integrity" xmlns:sch="http://webservice.mks.com/10/Integrity/schema">' +
 						'<soapenv:Header/>' +
 						'<soapenv:Body>' +
-							'<int:editItem>' +
-								'<arg0 sch:ItemId="29">' +
+							'<int:getItemsByCustomQuery>' +
+								'<arg0>' +
 									'<sch:Username>%username%</sch:Username>' +
 									'<sch:Password>%password%</sch:Password>' +
+									'<sch:InputField>ID</sch:InputField>' +
+									'<sch:QueryDefinition>(field[ID]=0)</sch:QueryDefinition>' +
 								'</arg0>' +
-							'</int:editItem>' +
+							'</int:getItemsByCustomQuery>' +
 						'</soapenv:Body>' +
 					'</soapenv:Envelope>';
 				/**********************************************************************************/
@@ -380,7 +426,6 @@
 				/***********************************************************************************
 				* Continue button on-click event handler                                           *
 				***********************************************************************************/
-				$('#credentials-form').off();
 				$('#credentials-form').on('submit', function(e)
 				{
 					e.preventDefault();
@@ -450,11 +495,8 @@
 				});
 				/**********************************************************************************/
 
-				$('#credentials-username').parent().removeClass('has-error').val(username);
+				$('#credentials-username').parent().removeClass('has-error').val(username).focus();
 				$('#credentials-password').parent().removeClass('has-error').val('');
-				$('#credentials-username').val(username);
-				$('#credentials-username').focus();
-				$('#credentials-password').val('');
 				$('#modal-credentials').modal('show');
 			}
 		}
@@ -667,5 +709,4 @@
 		$('\n\t<style type="text/css">\n\t\t' + styles.join('\n\t\t') + '\n\t</style>\n').appendTo($('head'));
 	});
 	/**********************************************************************************/
-
 })(jQuery);

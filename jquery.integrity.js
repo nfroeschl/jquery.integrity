@@ -1,86 +1,32 @@
-/***********************************************************************************
-* Polyfill for btoa and atob                                                       *
-***********************************************************************************/
-;(function ()
-{
-	var object = typeof exports != 'undefined' ? exports : this; // #8: web workers
-	var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-
-	function InvalidCharacterError(message)
-	{
-		this.message = message;
-	}
-
-	InvalidCharacterError.prototype = new Error;
-	InvalidCharacterError.prototype.name = 'InvalidCharacterError';
-
-	// encoder
-	// [https://gist.github.com/999166] by [https://github.com/nignag]
-	object.btoa || (
-	object.btoa = function (input)
-	{
-		var str = String(input);
-		for (var block, charCode, idx = 0, map = chars, output = ''; str.charAt(idx | 0) || (map = '=', idx % 1); output += map.charAt(63 & block >> 8 - idx % 1 * 8))
-		{
-			charCode = str.charCodeAt(idx += 3/4);
-			if (charCode > 0xFF)
-			{
-				throw new InvalidCharacterError("'btoa' failed: The string to be encoded contains characters outside of the Latin1 range.");
-			}
-
-			block = block << 8 | charCode;
-		}
-
-		return output;
-	});
-
-	// decoder
-	// [https://gist.github.com/1020396] by [https://github.com/atk]
-	object.atob || (
-	object.atob = function (input)
-	{
-		var str = String(input).replace(/=+$/, '');
-		if (str.length % 4 == 1)
-		{
-			throw new InvalidCharacterError("'atob' failed: The string to be decoded is not correctly encoded.");
-		}
-
-		for (var bc = 0, bs, buffer, idx = 0, output = ''; buffer = str.charAt(idx++); ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0)
-		{
-			buffer = chars.indexOf(buffer);
-		}
-
-		return output;
-	});
-}());
-/**********************************************************************************/
-
-
 (function ($,undefined)
 {
 	/***********************************************************************************
-	* Private properties                                                               *
+	* Private variables                                                                *
 	***********************************************************************************/
 	var defaults =
 	{
-		url: (typeof weburl !== 'undefined') ? weburl + 'webservices/10/Integrity/' : null,
-		type: 'POST',
-		contentType : 'text/xml; charset=utf-8',
-		processData: false,
-		dataType: 'xml',
-		headers:
+		url : (typeof weburl !== 'undefined') ? weburl + 'webservices/10/Integrity/' : undefined,
+		appendMethodToURL : false,
+		envAttributes :
 		{
-			SOAPAction : ''
+			'xmlns:int' : 'http://webservice.mks.com/10/Integrity',
+			'xmlns:sch' : 'http://webservice.mks.com/10/Integrity/schema'
+		},
+		SOAPAction : '',
+		enableLogging : false,
+		HTTPHeaders:
+		{
+			"Content-Type" : "text/xml; charset=utf-8"
 		}
 	};
 
 	var integrity =
 	{
-		username       : '',
-		password       : '',
-		impersonating  : false,
-		dateformat     : false,
-		datetimeformat : false
+		'username'       : '',
+		'password'       : '',
+		'impersonating'  : false,
+		'dateformat'     : false,
+		'datetimeformat' : false
 	};
 
 	var methods =
@@ -89,19 +35,15 @@
 		'edit'   : 'int:editItem',
 		'get'    : 'int:getItemsByCustomQuery'
 	};
-	/**********************************************************************************/
-
 
 
 	/***********************************************************************************
-	* API                                                                              *
+	* Integrity jQuery utility functions                                               *
 	***********************************************************************************/
-	$.integrity = function (verb, params, success, error, beforeSend)
+	$.integrity = function (verb, params, success, error)
 	{
 		var config = {};
 		$.extend(config, defaults);
-		var url = config.url;
-		delete config.url;
 
 		/***********************************************************************************
 		* Type checking                                                                    *
@@ -120,141 +62,61 @@
 		{
 			throw new ReferenceError('Web service parameters must be of type object');
 		}
-
-		if ((!integrity.username) || (!integrity.password))
-		{
-			throw new Error('Missing credentials');
-		}
 		/**********************************************************************************/
 
 
 		/***********************************************************************************
 		* Modify local success method                                                      *
 		***********************************************************************************/
-		var scallback = config.success;
-		config.success = function (data, status, jqxhr)
+		if (typeof success === 'function')
 		{
-			var json = $.xml2json(data);
-
-			if (typeof scallback === 'function')
+			var scallback = config.success;
+			config.success = function (soapResponse)
 			{
-				scallback.call(this, json);
-			}
-
-			if (typeof success === 'function')
-			{
-				success.call(this, json);
+				if (typeof scallback === 'function')
+				{
+					scallback.call(this, soapResponse);
+				}
+				success.call(this, soapResponse);
 			}
 		}
 		/**********************************************************************************/
 
 
 		/***********************************************************************************
-		* Modify local error method                                                      *
+		* Modify local error method                                                        *
 		***********************************************************************************/
-		var fcallback = config.error;
-		config.error = function (jqxhr, status, errortxt)
+		if (typeof error === 'function')
 		{
-			var json = (jqxhr.responseXML) ? $.xml2json(jqxhr.responseXML) : (jqxhr.responseText) ? $.xml2json(jqxhr.responseText) : {};
-
-			if (typeof fcallback === 'function')
+			var ecallback = config.error;
+			config.error = function (soapResponse)
 			{
-				fcallback.call(this, json);
-			}
-
-			if (typeof error === 'function')
-			{
-				error.call(this, json);
-			}
-		}
-		/**********************************************************************************/
-
-
-		/***********************************************************************************
-		* Modify local beforeSend method                                                   *
-		***********************************************************************************/
-		var bscallback = config.beforeSend;
-		config.beforeSend = function (jqxhr, params)
-		{
-			params.toString = function ()
-			{
-				if (typeof params.data === 'string')
+				if (typeof ecallback === 'function')
 				{
-					return params.data;
+					ecallback.call(this, soapResponse);
 				}
-				if ($.isXMLDoc(params.data))
-				{
-					return dom2string(params.data);
-				}
-			};
-
-			if (typeof bscallback === 'function')
-			{
-				bscallback.call(params, jqxhr);
-			}
-
-			if (typeof beforeSend === 'function')
-			{
-				return beforeSend.call(params, jqxhr);
+				error.call(this, soapResponse);
 			}
 		}
 		/**********************************************************************************/
 
 		config.data = envelope(verb, params);
-		return $.ajax(url, config);
+		return $.soap(config);
 	};
 
-	$.integrity.create = function (params, success, error, beforeSend)
+	$.integrity.create = function (params, success, error)
 	{
-		return $.integrity('create', params, success, error, beforeSend);
+		$.integrity('create', params, success, error);
 	};
 
-	$.integrity.edit = function (params, success, error, beforeSend)
+	$.integrity.edit = function (params, success, error)
 	{
-		return $.integrity('edit', params, success, error, beforeSend);
+		$.integrity('edit', params, success, error);
 	};
 
-	$.integrity.get = function (params, success, error, beforeSend)
+	$.integrity.get = function (params, success, error)
 	{
-		return $.integrity('get', params, success, error, beforeSend);
-	};
-
-	$.integrity.success = function (callback)
-	{
-		if (typeof callback === 'function')
-		{
-			defaults.success = callback;
-		}
-
-		return this;
-	};
-
-	$.integrity.error = function (callback)
-	{
-		if (typeof callback === 'function')
-		{
-			defaults.error = callback;
-		}
-		return this;
-	};
-
-	$.integrity.beforeSend = function (callback)
-	{
-		if (typeof callback === 'function')
-		{
-			defaults.beforeSend = callback;
-		}
-		return this;
-	};
-
-	$.integrity.setUrl = function (url)
-	{
-		if (typeof url === 'string')
-		{
-			defaults.url = url;
-		}
-
-		return this;
+		$.integrity('get', params, success, error);
 	};
 
 	$.integrity.getUrl = function ()
@@ -262,272 +124,88 @@
 		return defaults.url;
 	};
 
-	$.integrity.setUsername = function (username)
+	$.integrity.setUrl = function (url)
 	{
-		if (typeof username === 'string')
-		{
-			integrity.username = username;
-			localStorage.setItem('credentials-username', username);
-		}
-
-		return this;
+		defaults.url = url;
+		return $.integrity;
 	};
 
-	$.integrity.setPassword = function (password)
+	$.integrity.setCallback = function (type, callback)
 	{
-		if (typeof password === 'string')
-		{
-			sessionStorage.setItem('credentials-password', btoa(password));
-			integrity.password = password;
-		}
-
-		return this;
-	};
-
-	$.integrity.impersonate = function (user)
-	{
-		if (typeof user === 'string')
-		{
-			integrity.impersonating = user;
-		}
-
-		return this;
-	};
-
-	$.integrity.dateformat = function (format)
-	{
-		if (typeof format === 'string')
-		{
-			integrity.dateformat = format;
-		}
-
-		return this;
-	};
-
-	$.integrity.datetimeformat = function (format)
-	{
-		if (typeof format === 'string')
-		{
-			integrity.datetimeformat = format;
-		}
-
-		return this;
-	};
-
-
-	$.integrity.credentials = function (callback)
-	{
-		if ((integrity.username) && (integrity.password))
+		if ((/^(success|error|beforeSend)$/).test(type))
 		{
 			if (typeof callback === 'function')
 			{
-				callback.call(this);
-			}
-		}
-		else
-		{
-			var username = localStorage.getItem('credentials-username') || '';
-			var password = sessionStorage.getItem('credentials-password');
-
-			if ((username) && (password))
-			{
-				integrity.username = username;
-				integrity.password = atob(password);
-
-				if (typeof callback === 'function')
-				{
-					callback.call(this);
-				}
+				defaults[type] = callback;
 			}
 			else
 			{
-				/***********************************************************************************
-				* Add the credentials modal dialog as needed                                       *
-				***********************************************************************************/
-				if (!(document.getElementById('modal-credentials')))
-				{
-					var afun = (username) ? '' : ' autofocus';
-					var afpw = (username) ? ' autofocus' : '';
-
-					var modal =
-						'<div id="modal-credentials" class="modal fade">' +
-							'<div class="modal-dialog">' +
-								'<div class="modal-content">' +
-									'<form id="credentials-form">' +
-										'<div class="modal-header">' +
-											'<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>' +
-											'<h4 class="modal-title">Integrity Credentials</h4>' +
-										'</div>' +
-										'<div class="modal-body">' +
-											'<div class="container">' +
-												'<div class="col-lg-3">' +
-													'<fieldset id="credentials-inputs">' +
-														'<div>' +
-															'<label for="credentials-username">Username</label>' +
-															'<input class="form-control" type="text" id="credentials-username"' + afun + '>' +
-														'</div>' +
-														'<div>' +
-															'<label for="credentials-password">Password</label>' +
-															'<input class="form-control" type="password" id="credentials-password"' + afpw + '>' +
-														'</div>' +
-													'</fieldset>' +
-												'</div>' +
-											'</div>' +
-										'</div>' +
-										'<div class="modal-footer">' +
-											'<fieldset id="credentials-buttons">' +
-												'<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>' +
-												'<button type="submit" class="btn btn-primary has-spinner" id="credentials-continue">' +
-													'<i class="glyphicon glyphicon-refresh spinner"></i> Continue' +
-												'</button>' +
-											'</fieldset>' +
-										'</div>' +
-									'</form>' +
-								'</div>' +
-							'</div>' +
-						'</div>';
-
-					$('body').append(modal);
-
-					$('#credentials-inputs input').on('focus', function(evt)
-					{
-						$(evt.target).parent().removeClass('has-error');
-					});
-
-					$('#modal-credentials').on('hidden.bs.modal', function ()
-					{
-					    $('#credentials-form').off();
-					});
-				}
-				/**********************************************************************************/
-
-
-				/***********************************************************************************
-				* Set up the blank request for verifying credentials                               *
-				***********************************************************************************/
-				var request =
-					'<?xml version="1.0" encoding="UTF-8"?>' +
-					'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:int="http://webservice.mks.com/10/Integrity" xmlns:sch="http://webservice.mks.com/10/Integrity/schema">' +
-						'<soapenv:Header/>' +
-						'<soapenv:Body>' +
-							'<int:getItemsByCustomQuery>' +
-								'<arg0>' +
-									'<sch:Username>%username%</sch:Username>' +
-									'<sch:Password>%password%</sch:Password>' +
-									'<sch:InputField>ID</sch:InputField>' +
-									'<sch:QueryDefinition>(field[ID]=0)</sch:QueryDefinition>' +
-								'</arg0>' +
-							'</int:getItemsByCustomQuery>' +
-						'</soapenv:Body>' +
-					'</soapenv:Envelope>';
-				/**********************************************************************************/
-
-
-				/***********************************************************************************
-				* Continue button on-click event handler                                           *
-				***********************************************************************************/
-				$('#credentials-form').on('submit', function(e)
-				{
-					e.preventDefault();
-					var username = $('#credentials-username').val();
-					var password = $('#credentials-password').val();
-
-					if ((username) && (password))
-					{
-						$('#credentials-continue').addClass('active');
-						$('#credentials-inputs').prop('disabled', true);
-						$('#credentials-buttons').prop('disabled', true);
-
-						$.ajax(defaults.url,
-						{
-							type        : 'POST',
-							contentType : 'text/xml; charset=utf-8',
-							processData : false,
-							dataType    : 'xml',
-							headers     :
-							{
-								SOAPAction : ''
-							},
-							data        : request.replace('%username%', username).replace('%password%', password),
-							success     : function ()
-							{
-								localStorage.setItem('credentials-username', username);
-								sessionStorage.setItem('credentials-password', btoa(password));
-
-								integrity.username = username;
-								integrity.password = password;
-
-								$('#credentials-form').off();
-								$('#modal-credentials').modal('hide');
-								$('#credentials-continue').removeClass('active');
-								$('#credentials-inputs').prop('disabled', false);
-								$('#credentials-buttons').prop('disabled', false);
-								$('#credentials-username').value = '';
-								$('#credentials-password').value = '';
-
-								if (typeof callback === 'function')
-								{
-									callback.call();
-								}
-							},
-							error       : function ()
-							{
-								$('#credentials-continue').removeClass('active');
-								$('#credentials-inputs').prop('disabled', false);
-								$('#credentials-buttons').prop('disabled', false);
-								$('#credentials-username').parent().addClass('has-error');
-								$('#credentials-password').parent().addClass('has-error');
-							}
-						});
-					}
-					else
-					{
-						if (!username)
-						{
-							$('#credentials-username').parent().addClass('has-error');
-						}
-
-						if (!password)
-						{
-							$('#credentials-password').parent().addClass('has-error');
-						}
-					}
-				});
-				/**********************************************************************************/
-
-				$('#credentials-username').parent().removeClass('has-error').val(username).focus();
-				$('#credentials-password').parent().removeClass('has-error').val('');
-				$('#modal-credentials').modal('show');
+				throw new ReferenceError('Invalid callback (' + (typeof callback) + ') : value must be of type function');
 			}
-		}
-	};
-	/**********************************************************************************/
 
-
-
-	/***********************************************************************************
-	* Private utility functions                                                        *
-	***********************************************************************************/
-	function dom2string (dom)
-	{
-		if (typeof XMLSerializer!=="undefined")
-		{
-			return new window.XMLSerializer().serializeToString(dom);
+			return $.integrity;
 		}
 		else
 		{
-			return dom.xml;
+			throw new TypeError('Invalid callback type (' + type + ') : value must be success or error');
 		}
+	};
+
+	$.integrity.setDefault = function(key, value)
+	{
+		if (!(/^(url|success|error|beforeSend)$/i).test(key))
+		{
+			if ((/^(username|password|impersonating|datetime|datetimeformat)$/).test(key))
+			{
+				integrity[key] = value;
+			}
+			else
+			{
+				defaults[key] = value;
+			}
+		}
+		else
+		{
+			throw new Error('Cannot set ' + key + ' using setDefault method');
+		}
+
+		return $.integrity;
 	}
 
+	$.integrity.getDefault = function(key)
+	{
+		if ((/^(username|password|impersonating|dateformat|datetimeformat)$/).test(key))
+		{
+			return integrity[key];
+		}
+
+		return defaults[key];
+	}
+
+	$.integrity.logging =
+	{
+		'on' : function ()
+		{
+			defaults.enableLogging = true;
+		},
+
+		'off' : function ()
+		{
+			defaults.enableLogging = false;
+		}
+	};
+
+
+	/***********************************************************************************
+	* Private functions                                                                *
+	***********************************************************************************/
 	function envelope(verb, params)
 	{
 		verb       = verb.toLowerCase();
 		var method = methods[verb];
 		var env    = [];
 
-		env.push('<?xml version="1.0" encoding="UTF-8"?>');
-		env.push('<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:int="http://webservice.mks.com/10/Integrity" xmlns:sch="http://webservice.mks.com/10/Integrity/schema">');
+		env.push('<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:int="http://webservice.mks.com/10/2/Integrity" xmlns:sch="http://webservice.mks.com/10/2/Integrity/schema">');
 		env.push('<soapenv:Header/>');
 		env.push('<soapenv:Body>');
 		env.push('<' + method + '>');
@@ -652,61 +330,4 @@
 
 		return tag.join('');
 	}
-	/**********************************************************************************/
-
-
-
-	/***********************************************************************************
-	* Add credential styles                                                            *
-	***********************************************************************************/
-	var styles = [];
-
-	styles.push('.spinner');
-	styles.push('{');
-	styles.push('	display: none;');
-	styles.push('	opacity: 0;');
-	styles.push('	max-width: 0;');
-	styles.push('	-webkit-transition: opacity 0.25s, max-width 0.45s;');
-	styles.push('	-moz-transition: opacity 0.25s, max-width 0.45s;');
-	styles.push('	-o-transition: opacity 0.25s, max-width 0.45s;');
-	styles.push('	transition: opacity 0.25s, max-width 0.45s;');
-	styles.push('}');
-
-	styles.push('.has-spinner.active .spinner');
-	styles.push('{');
-	styles.push('	display: inline-block;');
-	styles.push('	opacity: 1;');
-	styles.push('	max-width: 50px;');
-	styles.push('	-webkit-transform-origin: 50% 50%;');
-	styles.push('	transform-origin:50% 50%;');
-	styles.push('	-ms-transform-origin:50% 50%;');
-	styles.push('	-webkit-animation: spin .75s infinite linear;');
-	styles.push('	-moz-animation: spin .75s infinite linear;');
-	styles.push('	-o-animation: spin .75s infinite linear;');
-	styles.push('	animation: spin .75s infinite linear;');
-	styles.push('}');
-
-	styles.push('@-moz-keyframes spin');
-	styles.push('{');
-	styles.push('	from { -moz-transform: rotate(0deg); }');
-	styles.push('	to { -moz-transform: rotate(360deg); }');
-	styles.push('}');
-
-	styles.push('@-webkit-keyframes spin');
-	styles.push('{');
-	styles.push('	from { -webkit-transform: rotate(0deg); }');
-	styles.push('	to { -webkit-transform: rotate(360deg); }');
-	styles.push('}');
-
-	styles.push('@keyframes spin');
-	styles.push('{');
-	styles.push('	from { transform: rotate(0deg); }');
-	styles.push('	to { transform: rotate(360deg); }');
-	styles.push('}');
-
-	$('document').ready(function ()
-	{
-		$('\n\t<style type="text/css">\n\t\t' + styles.join('\n\t\t') + '\n\t</style>\n').appendTo($('head'));
-	});
-	/**********************************************************************************/
 })(jQuery);

@@ -14,6 +14,18 @@
 
 		<link rel="stylesheet" href="/css/bootstrap.min.css">
 		<link rel="stylesheet" href="/css/bootstrap-theme.min.css">
+		<link rel="stylesheet" href="/css/font-awesome.min.css">
+
+		<style>
+			.message
+			{
+				position    : fixed;
+				top         : 20px;
+				right       : 20px;
+				width       : 300px;
+				z-index     : 9999;
+			}
+		</style>
 
 		<!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
 		<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
@@ -25,65 +37,51 @@
 		<script language='JavaScript'>
 			var weburl = '<%weburl%>';
 		</script>
-
 		<script src="/js/jquery.min.js"></script>
-		<script src="/js/jquery.bark.js"></script>
+		<script src="/js/bootstrap.min.js"></script>
 		<script src="/js/jquery.xml2json.js"></script>
+		<script src="/js/jquery.soap.js"></script>
 		<script src="/js/jquery.integrity.js"></script>
 		<script>
 			$(document).ready(function ()
 			{
 				$("#btnTest").click(runTest);
 
-				$.integrity.success(function (json)
+				$.integrity
+				.setCallback('beforeSend', function (soapEnvelope)
 				{
-					var title    = 'Success';
-					var priority = 'success';
-					var message  = undefined;
-
-					try
-					{
-						if (json.Body.createItemResponse)
-						{
-							message = 'Created Item ' + json.Body.createItemResponse['return']['ns1:ItemId'];
-						}
-						else if (json.Body.editItemResponse)
-						{
-							message = 'Saved Item ' + json.Body.editItemResponse['return']['ns1:ItemId'];
-						}
-						// no need to bark on the get-verb
-					}
-					catch (err) {}
-
-					$.bark({ 'title' : title, 'priority' : priority, 'message' : message });
+					$('#request').text(soapEnvelope.toString());
 				})
-				.error(function (json)
+				.setCallback('success', function (soapEnvelope)
 				{
-					var title    = 'Error';
-					var priority = 'danger';
-					var msg      = 'Unknown';
+					var json = (soapEnvelope.toJSON()).Body;
+					var type = 'success';
+					var msg  = false;
 
-					try
+					if (json.createItemResponse)
 					{
-						msg  = json.Body.Fault.faultstring;
-						if (json.Body.Fault.detail)
-						{
-							msg += ' : ' + json.Body.Fault.detail.MKSException;
-						}
+						msg = 'Created Item ' + json.createItemResponse.return['ns1:ItemId'];
 					}
-					catch (err) {}
-
-					$.bark({ 'title' : title, 'priority' : priority, 'message' : msg });
-				})
-				.beforeSend(function (params, jqxhr)
-				{
-					if (window.console)
+					else if (json.editItemResponse)
 					{
-						console.log(params.toString());
+						msg = 'Saved Item ' + json.editItemResponse.return['ns1:ItemId'];
+					}
+
+					if (msg)
+					{
+						growl(type, msg);
 					}
 				})
-				.setUsername('DefaultUsername')
-				.setPassword('defaultpassword');
+				.setCallback('error', function (soapEnvelope)
+				{
+					var json = (soapEnvelope.toJSON()).Body.Fault;
+					var type = 'danger';
+					var msg  = '<strong>' + json.faultstring + '</strong> : ' + json.detail.MKSException;
+
+					growl(type, msg);
+				})
+				.setDefault('username', 'username')
+				.setDefault('password', 'password');
 			});
 
 			function runTest ()
@@ -93,19 +91,24 @@
 
 				var itemId = $('#ItemId').val() || '123456';
 
-				$.integrity.edit({ 'ItemId' : itemId },
-				function (json)
+				$.integrity.edit( { 'ItemId' : itemId }, function (soapResponse)
 				{
-					$('#response').text(JSON.stringify(json));
+					$('#response').text(JSON.stringify(soapResponse.toJSON()));
 				},
-				function (json)
+				function (soapResponse)
 				{
-					$('#response').text(JSON.stringify(json));
-				},
-				function (params, jqxhr)
-				{
-					$('#request').text(params.toString());
+					$('#response').text(JSON.stringify(soapResponse.toJSON()));
 				});
+			}
+
+			function growl(type, msg)
+			{
+				var message = $('<div class="alert alert-' + type + ' message alert-dismissible" style="display: none;">');
+				var close   = $('<button type="button" class="close" data-dismiss="alert">&times</button>');
+				message.append(close);
+				message.append(msg);
+
+				message.appendTo($('body')).fadeIn(300).delay(1500).fadeOut(300);
 			}
 		</script>
 	</head>

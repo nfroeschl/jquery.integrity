@@ -1,6 +1,8 @@
 # jQuery Integrity #
 *A jQuery wrapper for [PTC Integrity](http://www.mks.com/platform/our-product) Web Services.*
 
+This documentation is out of date - this plugin no longer requires jquery.soap.js - updated documentation to come.
+
 ## Description ##
 
 The jQuery Integrity plugin wraps the [jQuery Soap](https://github.com/doedje/jquery.soap) plugin and makes it easy to interact with the (convoluted) web services exposed by the Integrity application. Note that [jquery.soap has it's own dependencies](https://github.com/doedje/jquery.soap#dependencies) that will also need to be resolved.

@@ -1,6 +1,10 @@
 # jQuery Integrity #
 *A jQuery wrapper for [PTC Integrity](http://www.mks.com/platform/our-product) Web Services.*
 
+## Important! ##
+
+I am no longer working with PTC Integrity, and will not be maintaining this library. If you'd like to take it over, please shoot me an email and I'd be happy to turn it over to you. Otherwise, I will delete this repository in 2017.
+
 ## Description ##
 
 The jQuery Integrity plugin facilitates simplified interactions with the web services exposed by the Integrity application. This plugin is intended to be used on pages created by Integrity reporting recipes to allow reports to make web service calls using the verbs `create`, `edit` and `get`.
